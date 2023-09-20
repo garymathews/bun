@@ -102,16 +102,28 @@ function cp(src, dest, options) {
 // TODO: implement this in native code using a Dir Iterator 💀
 // This is currently stubbed for Next.js support.
 class Dir {
-  #entries: Dirent[];
-  constructor(e: Dirent[]) {
-    this.#entries = e;
+  path: string;
+  #entries?: Dirent[];
+  constructor(path: string) {
+    this.path = path;
+    this.#entries = undefined;
   }
   readSync() {
+    if (!this.#entries) {
+      this.#entries = fs.readdirSync(this.path, { withFileTypes: true });
+    }
     return this.#entries.shift() ?? null;
   }
-  read(c) {
-    if (c) process.nextTick(c, null, this.readSync());
-    return Promise.resolve(this.readSync());
+  async read(c) {
+    if (!this.#entries) {
+      this.#entries = await fs.readdir(this.path, { withFileTypes: true });
+    }
+    const entry = this.#entries.shift() ?? null;
+    if (c) {
+      c(null, entry);
+      return;
+    }
+    return entry;
   }
   closeSync() {}
   close(c) {
@@ -126,8 +138,7 @@ class Dir {
   }
 }
 async function opendir(dir: string) {
-  const entries = await fs.readdir(dir, { withFileTypes: true });
-  return new Dir(entries);
+  return new Dir(dir);
 }
 
 export default {
